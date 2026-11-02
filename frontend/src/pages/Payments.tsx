@@ -14,11 +14,16 @@ import { api } from "../lib/api";
 import { duration, money, reasonText, when } from "../lib/format";
 import type { PaymentRequest, Reason, Transaction } from "../lib/types";
 
-function Stat({ label, value, icon, fill }: { label: string; value: ReactNode; icon: ReactNode; fill: string }) {
+function Stat({ label, value, icon, color }: { label: string; value: ReactNode; icon: ReactNode; color: string }) {
   return (
-    <div className="card flex items-center justify-between">
-      <div className="min-w-0"><p className="label text-ink-mute">{label}</p><p className="font-pixel font-bold text-[32px] leading-10 money">{value}</p></div>
-      <span className={`w-16 h-16 shrink-0 ml-3 rounded-full border border-ink flex items-center justify-center ${fill}`}>{icon}</span>
+    <div className="bg-white border border-[#E6E7E8] rounded-xl p-6 shadow-sm flex items-center justify-between">
+      <div className="min-w-0">
+        <p className="text-sm font-medium text-[#686A6D] mb-1">{label}</p>
+        <p className="text-2xl font-semibold text-black tabular-nums">{value}</p>
+      </div>
+      <span className={`w-12 h-12 shrink-0 ml-4 rounded-full flex items-center justify-center ${color}`}>
+        {icon}
+      </span>
     </div>
   );
 }
@@ -32,10 +37,11 @@ export default function Payments() {
   const awaiting = (reqs.data ?? []).filter((r) => r.status === "AWAITING_APPROVAL").length;
   const blocked = (reqs.data ?? []).filter((r) => r.status === "BLOCKED").length;
 
-  // While a payout is PENDING, ask PayPal every 5 seconds. After about 2 minutes stop and leave the Refresh button.
+  // While a payout is PENDING, ask PayPal every 5 seconds.
   const rows = useRef<Transaction[]>([]);
   rows.current = txns.data ?? [];
   const polling = rows.current.some((t) => t.status === "PENDING");
+  
   useEffect(() => {
     if (!polling) return;
     let tries = 0;
@@ -66,8 +72,9 @@ export default function Payments() {
       valueFormatter: (p) => { const r: Reason[] = p.value ?? []; return r.length ? reasonText(r[0]) + (r.length > 1 ? ` (+${r.length - 1})` : "") : ""; } },
     { field: "created_at", headerName: "Requested", minWidth: 190, valueFormatter: (p) => when(p.value) },
     { field: "status", headerName: "Status", minWidth: 210, cellRenderer: (p: ICellRendererParams<PaymentRequest>) => <StatusBadge value={p.value} /> },
-    { headerName: "", maxWidth: 110, sortable: false, cellRenderer: (p: ICellRendererParams<PaymentRequest>) => p.data && <Link className="text-blue underline" to={`/replay/${p.data.id}`}>Replay</Link> },
+    { headerName: "", maxWidth: 110, sortable: false, cellRenderer: (p: ICellRendererParams<PaymentRequest>) => p.data && <Link className="text-[#0070E0] font-medium hover:underline text-sm" to={`/replay/${p.data.id}`}>Replay</Link> },
   ];
+  
   const txCols: ColDef<Transaction>[] = [
     { field: "invoice", headerName: "Invoice", maxWidth: 130 },
     { field: "amount", headerName: "Amount", type: "rightAligned", maxWidth: 130, valueFormatter: (p) => money(p.value, p.data?.currency), cellClass: "money" },
@@ -81,23 +88,55 @@ export default function Payments() {
   ];
 
   const err = reqs.error ?? txns.error;
+
   return (
     <div>
       <PageHeader note="the money trail" title="Payments" text="Every request and every payout, with its decision." />
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-        <Stat label="Paid total" value={txns.loading && !txns.data ? "-" : money(paid)} fill="bg-green" icon={<BadgeCheck size={32} aria-hidden />} />
-        <Stat label="Awaiting approval" value={reqs.loading && !reqs.data ? "-" : awaiting} fill="bg-yellow" icon={<Hourglass size={32} aria-hidden />} />
-        <Stat label="Blocked" value={reqs.loading && !reqs.data ? "-" : blocked} fill="bg-pink" icon={<ShieldX size={32} aria-hidden />} />
+      
+      {/* KPI Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
+        <Stat 
+          label="Paid Total" 
+          value={txns.loading && !txns.data ? "-" : money(paid)} 
+          color="bg-emerald-50 text-emerald-600" 
+          icon={<BadgeCheck size={24} />} 
+        />
+        <Stat 
+          label="Awaiting Approval" 
+          value={reqs.loading && !reqs.data ? "-" : awaiting} 
+          color="bg-amber-50 text-amber-600" 
+          icon={<Hourglass size={24} />} 
+        />
+        <Stat 
+          label="Blocked" 
+          value={reqs.loading && !reqs.data ? "-" : blocked} 
+          color="bg-red-50 text-red-600" 
+          icon={<ShieldX size={24} />} 
+        />
       </div>
+
       <TotalPaidChart txns={txns.data ?? []} />
-      <div className="flex mb-4" role="tablist">
+
+      {/* Modern Tabs */}
+      <div className="flex items-center gap-6 border-b border-[#E6E7E8] mb-6 mt-8">
         {(["requests", "payouts"] as const).map((t) => (
-          <button key={t} role="tab" aria-selected={tab === t} onClick={() => setTab(t)}
-            className={`label border border-ink px-4 py-2 -ml-[2px] first:ml-0 ${tab === t ? "bg-blue text-white" : "bg-card hover:bg-sky"}`}>{t === "requests" ? "Requests" : "Payouts"}</button>
+          <button 
+            key={t} 
+            onClick={() => setTab(t)}
+            className={`pb-3 text-sm font-medium transition-colors border-b-2 ${
+              tab === t 
+                ? "border-[#0070E0] text-[#0070E0]" 
+                : "border-transparent text-[#686A6D] hover:text-black hover:border-[#E6E7E8]"
+            }`}
+          >
+            {t === "requests" ? "Payment Requests" : "Payouts"}
+          </button>
         ))}
       </div>
+
       {err && <ErrorState message={err} onRetry={() => { reqs.reload(); txns.reload(); }} />}
-      {polling && <p className="text-[13px] text-ink-mute mb-2" aria-live="polite">A payout is still pending. Checking PayPal every 5 seconds.</p>}
+      {polling && <p className="text-sm text-[#686A6D] mb-3" aria-live="polite">A payout is still pending. Checking PayPal every 5 seconds...</p>}
+      
       {tab === "requests"
         ? <OpsGrid rows={reqs.error ? null : reqs.data} cols={reqCols} loading={reqs.loading} empty={{ note: "no payments yet", text: "Ask the agent to pay an invoice to see its decision here." }} />
         : <OpsGrid rows={txns.error ? null : txns.data} cols={txCols} loading={txns.loading} empty={{ note: "no payouts yet", text: "Payouts appear after a payment is sent to PayPal." }} />}

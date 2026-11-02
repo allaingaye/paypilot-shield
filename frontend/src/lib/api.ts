@@ -1,5 +1,5 @@
-// BASE_URL is "/" or "/paypilot/", so the API follows the app to its base path
-const BASE = import.meta.env.VITE_API_URL || `${import.meta.env.BASE_URL}api`;
+// Always same-origin: nginx (prod) or Vite (dev) proxies /api/* to the backend.
+const BASE = import.meta.env.VITE_API_URL || "/api";
 
 export class ApiError extends Error {
   constructor(public status: number, public detail: string) {
@@ -15,10 +15,10 @@ export async function api<T>(path: string, options: { method?: string; body?: un
   const hasBody = options.body !== undefined;
   const res = await fetch(BASE + path, {
     method: options.method ?? (hasBody ? "POST" : "GET"),
-    credentials: "include",  // the login token is an httpOnly cookie that scripts cannot read
+    credentials: "include",
     headers: {
       ...(hasBody ? { "Content-Type": "application/json" } : {}),
-      "X-Requested-With": "paypilot",  // the server needs this on writes, which a cross-site form cannot send
+      "X-Requested-With": "paypilot",
     },
     body: hasBody ? JSON.stringify(options.body) : undefined,
   });
@@ -30,7 +30,7 @@ export async function api<T>(path: string, options: { method?: string; body?: un
     } catch { /* keep statusText */ }
     if (res.status === 401 && path !== "/auth/login" && path !== "/auth/logout") {
       sessionStorage.removeItem("email");
-      window.location.assign(import.meta.env.BASE_URL + "login?expired=1");
+      window.location.assign("/login?expired=1");
     }
     throw new ApiError(res.status, detail);
   }

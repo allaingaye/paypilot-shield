@@ -26,7 +26,7 @@ services:
       # Bundled Postgres by default. For your own Postgres set DOCKER_DATABASE_URL in .env
       # (DATABASE_URL there is for running the backend outside Docker).
       DATABASE_URL: ${DOCKER_DATABASE_URL:-postgresql://paypilot:${POSTGRES_PASSWORD:-paypilot}@db:5432/paypilot}
-      FORWARDED_ALLOW_IPS: 172.28.0.0/24  # trust X-Forwarded-For only from containers on this network (nginx)
+      FORWARDED_ALLOW_IPS: 172.30.0.0/16  # trust X-Forwarded-For only from containers on this network (nginx)
     # Inside the container "localhost" is the container itself: for a Postgres on this machine
     # use host.docker.internal in DOCKER_DATABASE_URL (works on Linux, Windows and macOS).
     extra_hosts:
@@ -52,9 +52,10 @@ services:
 
 networks:
   default:
+    driver: bridge
     ipam:
       config:
-        - subnet: 172.28.0.0/24
+        - subnet: 172.30.0.0/16
 
 volumes:
   pgdata:

@@ -1,4 +1,4 @@
-import { BadgeCheck, KeyRound } from "lucide-react";
+import { BadgeCheck, KeyRound, ShieldAlert } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import { ApiError } from "../lib/api";
@@ -33,7 +33,14 @@ export default function SigningModal({ title = "Sign with your key", confirmLabe
   useEffect(() => {
     const opener = document.activeElement as HTMLElement | null;
     box.current?.focus();
-    return () => opener?.focus();
+    
+    const originalOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    
+    return () => {
+      opener?.focus();
+      document.body.style.overflow = originalOverflow;
+    };
   }, []);
 
   const onKey = (e: React.KeyboardEvent) => {
@@ -56,46 +63,70 @@ export default function SigningModal({ title = "Sign with your key", confirmLabe
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-ink/55" onKeyDown={onKey}>
-      <div ref={box} tabIndex={-1} role="dialog" aria-modal="true" aria-labelledby="sign-title"
-           className="relative bg-card border border-ink rounded shadow-hard-lg w-[560px] max-w-full p-6 pt-8"
-           style={{ animation: "pagein 200ms cubic-bezier(0.2,0,0,1)" }}>
-        <span className="tape -top-3 -left-3 -rotate-6" aria-hidden />
-        <span className="tape -top-3 -right-3 rotate-[5deg]" aria-hidden />
-        <div className="max-h-[80vh] overflow-y-auto px-1 -mx-1">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm transition-opacity" onKeyDown={onKey}>
+      <div 
+        ref={box} 
+        tabIndex={-1} 
+        role="dialog" 
+        aria-modal="true" 
+        aria-labelledby="sign-title"
+        className="relative bg-white rounded-2xl shadow-2xl w-[560px] max-w-full overflow-hidden flex flex-col"
+        style={{ animation: "modalIn 200ms cubic-bezier(0.16, 1, 0.3, 1)" }}
+      >
         {phase === "sealed" ? (
-          <div className="text-center py-4" aria-live="polite">
-            <div className="mx-auto w-[72px] h-[72px] rounded-full bg-green border border-ink shadow-hard flex items-center justify-center" style={{ animation: "seal 400ms ease-out, ring 400ms ease-out" }}>
-              <BadgeCheck size={36} aria-hidden />
+          <div className="p-10 text-center flex flex-col items-center" aria-live="polite">
+            <div className="w-20 h-20 rounded-full bg-emerald-50 flex items-center justify-center mb-6 shadow-sm border border-emerald-100">
+              <BadgeCheck size={40} className="text-emerald-600" aria-hidden />
             </div>
-            <p className="note mt-3">signed and verified!</p>
-            <div className="text-[14px] mt-2">{done}</div>
-            <Button variant="primary" className="mt-5" onClick={onClose}>Close</Button>
+            <h2 className="text-2xl font-semibold text-black tracking-tight mb-2">Payment Authorized</h2>
+            <div className="text-sm text-[#686A6D] mb-8">{done}</div>
+            <Button variant="primary" className="w-full sm:w-auto min-w-[120px]" onClick={onClose}>Close</Button>
           </div>
         ) : (
           <>
-            <div className="flex items-center gap-3 mb-4">
-              <div className="w-11 h-11 rounded-full bg-cyan border border-ink flex items-center justify-center shrink-0"><KeyRound size={20} aria-hidden /></div>
+            {/* Header */}
+            <div className="px-6 py-5 border-b border-[#E6E7E8] flex items-center gap-4 bg-[#F9FAFB]">
+              <div className="w-12 h-12 rounded-full bg-[#0070E0]/10 flex items-center justify-center shrink-0 border border-[#0070E0]/20">
+                <KeyRound size={24} className="text-[#0070E0]" aria-hidden />
+              </div>
               <div>
-                <h2 id="sign-title">{title}</h2>
-                <p className="text-[13px] text-ink-mute">Your key never leaves this browser.</p>
+                <h2 id="sign-title" className="text-lg font-semibold text-black">{title}</h2>
+                <p className="text-xs text-[#686A6D] mt-0.5">Your private key never leaves this browser.</p>
               </div>
             </div>
-            <div className="border border-ink rounded p-4 mb-4">{summary}</div>
-            <details className="mb-4">
-              <summary className="label cursor-pointer">Exact data you are signing</summary>
-              <div className="mt-2">{payload ? <CodeBlock text={payload} /> : <p className="text-[13px]">Preparing...</p>}</div>
-            </details>
-            {(prepError || (phase === "failed" && error)) && <div className="mb-4"><Banner kind="error" title="Could not complete signing">{prepError ?? error}</Banner></div>}
-            <div className="flex justify-end gap-3">
-              <Button variant="secondary" onClick={onClose} disabled={phase === "signing"}>Cancel</Button>
+
+            {/* Body */}
+            <div className="p-6 max-h-[70vh] overflow-y-auto space-y-6">
+              {summary}
+              
+              <details className="group border border-[#E6E7E8] rounded-xl overflow-hidden bg-white">
+                <summary className="px-4 py-3 text-sm font-medium text-[#686A6D] cursor-pointer hover:bg-gray-50 flex items-center justify-between select-none list-none [&::-webkit-details-marker]:hidden">
+                  <span>Exact data you are signing</span>
+                  <span className="text-xs text-gray-400 group-open:rotate-180 transition-transform">▼</span>
+                </summary>
+                <div className="p-4 border-t border-[#E6E7E8] bg-[#F9FAFB] overflow-x-auto">
+                  {payload ? <CodeBlock text={payload} /> : <p className="text-sm text-[#686A6D]">Preparing signature payload...</p>}
+                </div>
+              </details>
+
+              {(prepError || (phase === "failed" && error)) && (
+                <Banner kind="error" title="Could not complete signing">
+                  {prepError ?? error}
+                </Banner>
+              )}
+            </div>
+
+            {/* Footer Actions */}
+            <div className="px-6 py-4 border-t border-[#E6E7E8] bg-[#F9FAFB] flex justify-end gap-3">
+              <Button variant="secondary" onClick={onClose} disabled={phase === "signing"}>
+                Cancel
+              </Button>
               <Button variant="primary" onClick={sign} loading={phase === "signing"} disabled={!payload}>
                 {phase === "signing" ? "Signing..." : phase === "failed" ? "Try again" : confirmLabel}
               </Button>
             </div>
           </>
         )}
-        </div>
       </div>
     </div>
   );

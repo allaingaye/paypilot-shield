@@ -4,61 +4,54 @@
 
 @layer base {
   body {
-    @apply bg-paper text-ink font-sans antialiased;
-    background-image: repeating-linear-gradient(to bottom, transparent 0, transparent 31px, theme(colors.rule) 31px, theme(colors.rule) 32px);
+    @apply bg-[#F0F2F9] text-black font-sans antialiased;
   }
-  :focus-visible { outline: 3px solid theme(colors.blue.mid); outline-offset: 2px; }
-  a.text-blue:hover { color: theme(colors.blue.mid); }
-  h1 { @apply text-[28px] leading-[34px] font-extrabold; }
-  h2 { @apply text-[20px] leading-[28px] font-extrabold; }
-  h3 { @apply text-[15px] leading-6 font-bold; }
+  h1 { @apply text-2xl font-semibold tracking-tight; }
+  h2 { @apply text-lg font-semibold tracking-tight; }
+  h3 { @apply text-base font-semibold; }
 }
+
+@keyframes slideIn {
+  from { transform: translateX(100%); }
+  to { transform: translateX(0); }
+}
+
+@keyframes modalIn {
+  from { opacity: 0; transform: scale(0.95) translateY(10px); }
+  to { opacity: 1; transform: scale(1) translateY(0); }
+} 
 
 @layer components {
-  .card { @apply bg-card border border-ink rounded shadow-hard p-5; }
-  .label { @apply font-mono text-[11px] leading-4 font-bold uppercase tracking-[0.08em]; }
-  .note { @apply font-hand font-bold text-[22px] leading-6; }
-  .money { @apply tabular-nums; }
-  .pixel { @apply font-pixel font-bold tabular-nums; }
-  .input { @apply w-full h-11 px-4 bg-card border border-ink rounded shadow-hard font-sans text-[15px]; }
-  .btn { @apply inline-flex items-center justify-center gap-2 h-10 px-4 border border-ink rounded font-mono text-xs font-bold uppercase tracking-[0.08em] transition-all duration-100 disabled:opacity-50 disabled:shadow-none disabled:cursor-not-allowed disabled:translate-x-0 disabled:translate-y-0; }
-  .btn-hover { @apply hover:-translate-x-px hover:-translate-y-px hover:shadow-hard active:translate-x-0.5 active:translate-y-0.5 active:shadow-none; }
-  .btn-primary { @apply btn btn-hover bg-blue text-white shadow-hard-sm; }
-  .btn-brand { @apply btn btn-hover bg-blue text-white shadow-hard-sm; }
-  .btn-secondary { @apply btn bg-card text-ink text-[11px] hover:bg-sky; }
-  .btn-danger { @apply btn btn-hover bg-pink text-ink shadow-hard-sm; }
-  .btn-chip { @apply inline-flex items-center border border-ink rounded shadow-hard-sm px-3 py-2 font-sans text-[14px] font-semibold transition-all duration-100 hover:-translate-x-px hover:-translate-y-px hover:shadow-hard active:translate-x-0.5 active:translate-y-0.5 active:shadow-none disabled:opacity-50 disabled:shadow-none disabled:cursor-not-allowed; }
-  .tape { @apply absolute w-[76px] h-6 pointer-events-none; background: theme(colors.yellow.DEFAULT / 75%); }
-  .page-in { animation: pagein 160ms ease-out; }
-  @keyframes pagein { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
-  @keyframes ring { 0% { box-shadow: 0 0 0 0 theme(colors.cyan.DEFAULT); } 100% { box-shadow: 0 0 0 14px transparent; } }
-  @keyframes seal { 0% { transform: scale(0.8); } 100% { transform: scale(1); } }
-  @keyframes pulse2 { 0%, 100% { opacity: 0.6; } 50% { opacity: 1; } }
+  .card { 
+    @apply bg-white border border-[#E6E7E8] rounded-xl shadow-[0_1px_2px_rgba(0,0,0,0.04)] p-6; 
+  }
+  .label { 
+    @apply text-xs font-medium text-[#686A6D]; 
+  }
+  .input { 
+    @apply w-full h-11 px-4 bg-white border border-[#E6E7E8] rounded-lg text-sm transition-colors focus:outline-none focus:ring-2 focus:ring-[#0070E0]/30 focus:border-[#0070E0]; 
+  }
+  .btn { 
+    @apply inline-flex items-center justify-center gap-2 h-11 px-6 rounded-full text-sm font-medium transition-all duration-150 disabled:opacity-50 disabled:cursor-not-allowed; 
+  }
+  .btn-primary { @apply btn bg-black text-white hover:bg-neutral-800; }
+  .btn-secondary { @apply btn bg-white text-black border border-[#E6E7E8] hover:bg-gray-50; }
+  .btn-chip { @apply inline-flex items-center border border-[#E6E7E8] bg-white rounded-full px-4 py-2 text-sm hover:bg-gray-50 transition-colors; }
 }
 
-@media (prefers-reduced-motion: reduce) {
-  *, *::before, *::after { animation: none !important; transition: none !important; }
-}
-
+/* AG Grid PayPal Theme */
 .ag-theme-quartz {
   --ag-font-family: Inter, system-ui, sans-serif;
-  --ag-font-size: 13px;
-  --ag-foreground-color: theme(colors.ink.DEFAULT);
-  --ag-background-color: theme(colors.card);
-  --ag-header-background-color: theme(colors.blue.DEFAULT);
-  --ag-header-foreground-color: theme(colors.card);
-  --ag-border-color: theme(colors.ink.DEFAULT);
-  --ag-row-border-color: theme(colors.rule);
-  --ag-row-hover-color: theme(colors.paper);
-  --ag-selected-row-background-color: theme(colors.sky);
-  --ag-range-selection-border-color: theme(colors.blue.mid);
-  --ag-row-height: 46px;
-  --ag-header-height: 44px;
-  --ag-cell-horizontal-padding: 16px;
-  --ag-border-radius: 2px;
+  --ag-font-size: 14px;
+  --ag-foreground-color: #000000;
+  --ag-background-color: #FFFFFF;
+  --ag-header-background-color: #F9FAFB;
+  --ag-header-foreground-color: #686A6D;
+  --ag-border-color: #E6E7E8;
+  --ag-row-border-color: #E6E7E8;
+  --ag-row-hover-color: #F3F4F6;
+  --ag-selected-row-background-color: #E0F2FE;
+  --ag-row-height: 56px;
+  --ag-header-height: 48px;
+  --ag-border-radius: 8px;
 }
-.ag-theme-quartz .ag-header-cell-text {
-  font-family: "JetBrains Mono", monospace; font-size: 11px; font-weight: 700;
-  letter-spacing: 0.08em; text-transform: uppercase;
-}
-.ag-theme-quartz .ag-cell { display: flex; align-items: center; }

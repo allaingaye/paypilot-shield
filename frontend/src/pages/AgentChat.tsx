@@ -1,9 +1,8 @@
-import { Check, PenLine, Send } from "lucide-react";
+import { Bot, ChevronRight, PenLine, Send, User, Terminal } from "lucide-react";
 import { FormEvent, useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import Banner from "../components/Banner";
 import Button from "../components/Button";
-import SectionTag from "../components/SectionTag";
 import StatusBadge from "../components/StatusBadge";
 import DecisionCard from "../components/DecisionCard";
 import StepBlock from "../components/StepBlock";
@@ -14,15 +13,15 @@ import type { AgentReply, AgentToolCall, PaymentSummary } from "../lib/types";
 
 interface Msg { role: "user" | "agent"; text: string; reply?: AgentReply; error?: boolean; }
 
-const STARTERS: [string, string, string][] = [
-  ["Pay INV-001", "bg-yellow", "-rotate-2"],
-  ["Pay INV-003", "bg-mint", "rotate-1.5"],
-  ["Why was INV-004 blocked?", "bg-rose", "-rotate-1"],
-  ["List invoices", "bg-yellow", "rotate-1"],
+const STARTERS = [
+  "Pay ABC Supplies for invoice INV-001",
+  "Pay Global Services for invoice INV-003",
+  "Why was INV-004 blocked?",
+  "List all unpaid invoices",
 ];
+
 const asRec = (v: unknown): Record<string, unknown> => (v && typeof v === "object" ? (v as Record<string, unknown>) : {});
 
-/** One plain line per tool result, so the side panel says what the tool found. */
 function toolSummary(t: AgentToolCall): string {
   if (typeof t.output === "string") return t.output;
   const o = asRec(t.output);
@@ -34,14 +33,13 @@ function toolSummary(t: AgentToolCall): string {
     case "get_policy": return `Auto limit ${money(Number(o.auto_limit))}, budget ${money(Number(o.monthly_budget))}, ${o.signed ? "signed" : "not signed"}`;
     case "explain_request": return `${Array.isArray(o.events) ? o.events.length : 0} audit steps`;
     case "submit_payment_request": return o.note ? String(o.note) : `${o.decision}: ${o.status}`;
-    default: return "Done.";
+    default: return "Completed.";
   }
 }
 
-/** Models answer in Markdown. Only **bold** is rendered, as React elements, never as HTML. */
 function Bold({ text }: { text: string }) {
   return <>{text.split(/(\*\*[^*\n]+\*\*)/).map((part, i) => part.startsWith("**") && part.endsWith("**") && part.length > 4
-    ? <strong key={i}>{part.slice(2, -2)}</strong> : part)}</>;
+    ? <strong key={i} className="font-semibold text-black">{part.slice(2, -2)}</strong> : part)}</>;
 }
 
 const MODE = { rules: "Rules mode", llm: "AI mode", rules_fallback: "AI fallback to rules" } as const;
@@ -51,7 +49,8 @@ export default function AgentChat() {
   const [text, setText] = useState("");
   const [busy, setBusy] = useState(false);
   const end = useRef<HTMLDivElement>(null);
-  useEffect(() => { end.current?.scrollIntoView({ block: "nearest" }); }, [msgs]);
+  
+  useEffect(() => { end.current?.scrollIntoView({ behavior: "smooth" }); }, [msgs]);
 
   const send = async (message: string) => {
     if (!message.trim() || busy) return;
@@ -73,67 +72,152 @@ export default function AgentChat() {
   const submit: PaymentSummary | undefined = last?.trace.find((t: AgentToolCall) => t.tool === "submit_payment_request")?.output as PaymentSummary | undefined;
 
   return (
-    <div>
-      <section className="text-center pt-4 pb-8">
-        <p className="note -rotate-2 inline-block text-[22px]">hi owner, what are we paying today?</p>
-        <h1 className="!text-[44px] !leading-[50px] tracking-[-0.02em]">The AI asks. The rules decide.</h1>
-        <div className="flex gap-4 justify-center mt-4">
-          <StatusBadge value="AUTO_PAY" rotate={-2} />
-          <span className="label inline-flex items-center gap-1.5 bg-yellow border border-ink rounded shadow-hard-sm px-2.5 py-1 rotate-1.5"><PenLine size={12} strokeWidth={3} aria-hidden />You sign</span>
-          <StatusBadge value="BLOCKED" rotate={-1} /> 
+    <div className="flex flex-col lg:flex-row h-[calc(100vh-8rem)] gap-6">
+      
+      {/* LEFT COLUMN: Chat Interface */}
+      <div className="flex-1 flex flex-col bg-white border border-[#E6E7E8] rounded-xl shadow-sm overflow-hidden">
+        {/* Chat Header */}
+        <div className="px-6 py-4 border-b border-[#E6E7E8] bg-white flex items-center justify-between">
+          <div>
+            <h1 className="text-lg font-semibold tracking-tight text-black">AI Payment Agent</h1>
+            <p className="text-xs text-[#686A6D] mt-0.5">Tell the agent what to pay. It handles the checks and executes via PayPal.</p>
+          </div>
+          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-[#F0F2F9] text-xs font-medium text-[#002991]">
+            <span className="w-1.5 h-1.5 rounded-full bg-[#0070E0] animate-pulse" />
+            Sandbox Active
+          </span>
         </div>
-      </section>
-      <div className="flex gap-8 flex-wrap items-start">
-        <section className="flex-1 min-w-[320px]" aria-labelledby="chat-h">
-          <div className="mb-4"><SectionTag id="chat-h">chat</SectionTag></div>
-          <div className="space-y-4 min-h-[200px]" aria-live="polite">
-            {msgs.map((m, i) => m.role === "user" ? (
-              <div key={i} className="flex justify-end"><p className="bg-blue text-white border border-ink rounded shadow-hard px-4 py-3 max-w-[420px]">{m.text}</p></div>
-            ) : m.error ? (
-              <div key={i} className="max-w-[640px]"><Banner kind="error" title="The agent could not answer">{m.text}</Banner></div>
-            ) : (
-              <div key={i} className="flex gap-3">
-                <span className="w-[34px] h-[34px] shrink-0 rounded-full bg-pink border border-ink flex items-center justify-center"><Check size={18} strokeWidth={3} aria-hidden /></span>
-                <div>
-                  <p className="bg-card border border-ink rounded shadow-hard px-4 py-3 max-w-[640px] whitespace-pre-wrap"><Bold text={m.text} /></p>
-                  {m.reply && (
-                    <p className="label text-ink-mute mt-2">
-                      {MODE[m.reply.mode]}
-                      {m.reply.payment_request_id && <> <Link className="text-blue underline ml-2" to={`/replay/${m.reply.payment_request_id}`}>View decision</Link></>}
-                    </p>
-                  )}
-                </div>
+
+        {/* Chat History */}
+        <div className="flex-1 overflow-y-auto p-6 space-y-6">
+          {msgs.length === 0 && (
+            <div className="h-full flex flex-col items-center justify-center text-center max-w-md mx-auto">
+              <div className="w-12 h-12 rounded-full bg-[#F0F2F9] flex items-center justify-center mb-4">
+                <Bot size={24} className="text-[#0070E0]" />
               </div>
-            ))}
-            {busy && <p className="label text-ink-mute">Agent is working...</p>}
-            <div ref={end} />
-          </div>
-          <div className="flex gap-3 flex-wrap my-5">
-            {STARTERS.map(([s, c, r]) => (
-              <Button key={s} variant="chip" onClick={() => send(s)} disabled={busy} className={`${c} ${r}`}>{s}</Button>
-            ))}
-          </div>
-          <form onSubmit={(e: FormEvent) => { e.preventDefault(); void send(text); }} className="flex gap-3">
-            <label className="flex-1"><span className="sr-only">Message to the agent</span>
-              <input className="input !h-[50px]" value={text} onChange={(e) => setText(e.target.value)} placeholder="Ask the agent, e.g. Pay INV-003" /></label>
-            <Button type="submit" loading={busy} className="!h-[50px]"><Send size={14} aria-hidden />Send</Button>
-          </form>
-          <p className="note text-[18px] mt-3">The agent can only request payments. A rules engine decides.</p>
-        </section>
-        <aside className="w-[412px] max-w-full min-[1100px]:sticky min-[1100px]:top-16 min-[1100px]:self-start min-[1100px]:max-h-[calc(100vh-5rem)] min-[1100px]:overflow-y-auto p-4 -m-4 space-y-4" aria-labelledby="did-h">
-          <SectionTag id="did-h">what the agent did</SectionTag>
-          {!last && <p className="text-[14px] text-ink-mute">Tool calls and the rules decision show up here.</p>}
-          {submit?.decision && (
-            <div className="pt-3"><DecisionCard invoice={submit.invoice} amount={submit.amount} decision={submit.decision} risk={submit.risk} reasons={submit.reasons} tilt={0.6} /></div>
+              <h3 className="text-lg font-medium text-black">How can I help you today?</h3>
+              <p className="text-sm text-[#686A6D] mt-1 mb-8">I can read invoices, check policies, and execute PayPal payments.</p>
+              
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 w-full">
+                {STARTERS.map((s) => (
+                  <button key={s} onClick={() => send(s)} className="text-left text-sm text-[#111] bg-white border border-[#E6E7E8] hover:bg-[#F0F2F9] hover:border-[#0070E0]/30 p-3 rounded-lg transition-all duration-150">
+                    {s}
+                  </button>
+                ))}
+              </div>
+            </div>
           )}
+
+          {msgs.map((m, i) => m.role === "user" ? (
+            <div key={i} className="flex justify-end gap-3">
+              <div className="bg-[#002991] text-white rounded-2xl rounded-tr-sm px-5 py-3 max-w-[85%] shadow-sm">
+                <p className="text-sm leading-relaxed">{m.text}</p>
+              </div>
+              <div className="w-8 h-8 rounded-full bg-[#F0F2F9] border border-[#E6E7E8] flex items-center justify-center shrink-0">
+                <User size={16} className="text-[#002991]" />
+              </div>
+            </div>
+          ) : m.error ? (
+            <div key={i} className="flex gap-3">
+               <div className="w-8 h-8 rounded-full bg-red-50 flex items-center justify-center shrink-0 border border-red-100">
+                <Bot size={16} className="text-red-600" />
+              </div>
+              <div className="flex-1 max-w-[85%]">
+                <Banner kind="error" title="Error">{m.text}</Banner>
+              </div>
+            </div>
+          ) : (
+            <div key={i} className="flex gap-3">
+              <div className="w-8 h-8 rounded-full bg-[#0070E0] flex items-center justify-center shrink-0 shadow-sm">
+                <Bot size={16} className="text-white" />
+              </div>
+              <div className="flex-1 max-w-[85%]">
+                <div className="bg-[#F9FAFB] border border-[#E6E7E8] rounded-2xl rounded-tl-sm px-5 py-4 shadow-sm text-sm text-[#111] leading-relaxed whitespace-pre-wrap">
+                  <Bold text={m.text} />
+                </div>
+                {m.reply && (
+                  <div className="mt-2 flex items-center gap-3">
+                    <span className="text-[11px] font-medium text-[#686A6D] bg-[#F0F2F9] px-2 py-0.5 rounded border border-[#E6E7E8]">
+                      {MODE[m.reply.mode]}
+                    </span>
+                    {m.reply.payment_request_id && (
+                      <Link className="text-xs font-medium text-[#0070E0] hover:underline flex items-center gap-1" to={`/replay/${m.reply.payment_request_id}`}>
+                        View audit trail <ChevronRight size={12} />
+                      </Link>
+                    )}
+                  </div>
+                )}
+              </div>
+            </div>
+          ))}
+          {busy && (
+             <div className="flex gap-3">
+              <div className="w-8 h-8 rounded-full bg-[#0070E0] flex items-center justify-center shrink-0">
+                <Bot size={16} className="text-white" />
+              </div>
+              <div className="bg-[#F9FAFB] border border-[#E6E7E8] rounded-2xl rounded-tl-sm px-5 py-4 shadow-sm flex items-center gap-1.5">
+                <span className="w-1.5 h-1.5 bg-[#0070E0] rounded-full animate-bounce" />
+                <span className="w-1.5 h-1.5 bg-[#0070E0] rounded-full animate-bounce [animation-delay:0.2s]" />
+                <span className="w-1.5 h-1.5 bg-[#0070E0] rounded-full animate-bounce [animation-delay:0.4s]" />
+              </div>
+            </div>
+          )}
+          <div ref={end} />
+        </div>
+
+        {/* Input Area */}
+        <div className="p-4 bg-white border-t border-[#E6E7E8]">
+          <form onSubmit={(e: FormEvent) => { e.preventDefault(); void send(text); }} className="relative flex items-center">
+            <input 
+              className="w-full h-12 pl-4 pr-14 bg-[#F0F2F9] border border-transparent focus:border-[#0070E0] focus:bg-white rounded-xl text-sm transition-all outline-none" 
+              value={text} 
+              onChange={(e) => setText(e.target.value)} 
+              placeholder="Ask the agent to pay an invoice..." 
+            />
+            <button 
+              type="submit" 
+              disabled={busy || !text.trim()}
+              className="absolute right-2 p-2 bg-[#0070E0] text-white rounded-lg hover:bg-[#005EA6] disabled:opacity-50 transition-colors"
+            >
+              <Send size={16} />
+            </button>
+          </form>
+        </div>
+      </div>
+
+      {/* RIGHT COLUMN: Agent Reasoning (Audit Trail) */}
+      <aside className="w-full lg:w-[420px] shrink-0 flex flex-col bg-white border border-[#E6E7E8] rounded-xl shadow-sm overflow-hidden">
+        <div className="px-5 py-4 border-b border-[#E6E7E8] bg-[#F9FAFB] flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <Terminal size={16} className="text-[#686A6D]" />
+            <h2 className="text-sm font-semibold text-black">Agent Reasoning</h2>
+          </div>
+          {last && <StatusBadge value={submit?.decision || "PENDING"} />}
+        </div>
+        
+        <div className="flex-1 overflow-y-auto p-5 space-y-5">
+          {!last && (
+            <div className="h-full flex flex-col items-center justify-center text-center px-4">
+              <PenLine size={24} className="text-[#686A6D] mb-3 opacity-50" />
+              <p className="text-sm text-[#686A6D]">Tool calls, policy checks, and risk assessments will appear here as the agent works.</p>
+            </div>
+          )}
+
+          {submit?.decision && (
+            <div className="bg-white border border-[#E6E7E8] rounded-lg p-4 shadow-sm mb-6">
+              <h3 className="text-xs font-semibold text-[#686A6D] uppercase tracking-wider mb-3">Payment Summary</h3>
+              <DecisionCard invoice={submit.invoice} amount={submit.amount} decision={submit.decision} risk={submit.risk} reasons={submit.reasons} tilt={0} />
+            </div>
+          )}
+
           {last?.trace.map((t, i) => (
             <StepBlock key={i} index={i} tab={t.tool} failed={t.tool === "llm_error"}>
-              <p className="font-mono text-[13px] break-all">{JSON.stringify(t.input ?? {})}</p>
-              <p className="text-[13px] text-step mt-1 break-words">{toolSummary(t)}</p>
+              <p className="text-sm text-[#111] break-words font-medium">{toolSummary(t)}</p>
             </StepBlock>
           ))}
-        </aside>
-      </div>
+        </div>
+      </aside>
+
     </div>
   );
 }

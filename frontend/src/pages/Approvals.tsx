@@ -39,7 +39,7 @@ export default function Approvals() {
     return (
       <div className="space-y-2">
         <StatusBadge value={r.status} />
-        <p>{item.invoice} {r.status === "PAID" ? "was paid" : "was sent"}. <Link className="text-blue underline" to={`/replay/${r.payment_request_id}`}>Replay the decision</Link></p>
+        <p className="text-sm">{item.invoice} {r.status === "PAID" ? "was paid" : "was sent"}. <Link className="text-[#0070E0] hover:underline font-medium" to={`/replay/${r.payment_request_id}`}>View decision trace</Link></p>
       </div>
     );
   };
@@ -56,15 +56,23 @@ export default function Approvals() {
   };
 
   return (
-    <div>
-      <PageHeader note="your decision" title="Approvals" text="Payments the rules engine sent to you. You sign the exact payment." />
-      {notice && <div className="mb-4"><Banner kind="info" title={notice} /></div>}
+    <div className="max-w-[800px] mx-auto">
+      <PageHeader 
+        note="your decision" 
+        title="Approvals" 
+        text="Payments the rules engine sent to you. You sign the exact payment." 
+      />
+      
+      {notice && <div className="mb-6"><Banner kind="info" title={notice} /></div>}
+      
       {loading && !data && <Skeleton />}
       {error && <ErrorState message={error} onRetry={reload} />}
-      {data && data.length === 0 && <EmptyState note="nothing is waiting for you" text="Ask the agent to pay an invoice that needs a decision." />}
-      <div className="max-w-[720px] space-y-10">
+      {data && data.length === 0 && <EmptyState note="nothing is waiting for you" text="Ask the agent to pay an invoice that requires human approval." />}
+      
+      <div className="space-y-6">
         {data?.map((a) => <ApprovalCard key={a.id} item={a} onSign={open} onReject={reject} />)}
       </div>
+
       {signing && (
         <SigningModal
           confirmLabel="Sign and approve"
@@ -72,9 +80,20 @@ export default function Approvals() {
           onClose={() => { setSigning(null); setNotice(null); }}
           onConfirm={confirm}
           summary={
-            <div className="space-y-1 text-[14px]">
-              <p><span className="label">Invoice</span> {signing.invoice} ({signing.supplier})</p>
-              <p><span className="label">Amount</span> <span className="money font-bold">{money(signing.amount, signing.currency)}</span></p>
+            <div className="space-y-3 bg-[#F9FAFB] p-4 rounded-lg border border-[#E6E7E8]">
+              <div className="flex justify-between items-center">
+                <span className="text-sm text-[#686A6D]">Invoice</span>
+                <span className="text-sm font-medium">{signing.invoice}</span>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-sm text-[#686A6D]">Supplier</span>
+                <span className="text-sm font-medium">{signing.supplier}</span>
+              </div>
+              <div className="flex justify-between items-center pt-2 border-t border-[#E6E7E8]">
+                <span className="text-sm font-medium">Total Amount</span>
+                <span className="text-lg font-semibold tabular-nums">{money(signing.amount, signing.currency)}</span>
+              </div>
+              
               {missingKey && (
                 <Banner kind="warn" title="This browser has no signing key" action={<button className="btn-secondary" onClick={() => setAskPassword(true)}>Create new key</button>}>
                   Create a new key to approve payments. You will need to sign the policy again.
@@ -84,6 +103,7 @@ export default function Approvals() {
           }
         />
       )}
+      
       {askPassword && <PasswordPrompt title="Create a new signing key" onSubmit={async (pw) => { await registerKey(pw); setMissingKey(false); }} onClose={() => setAskPassword(false)} />}
     </div>
   );
