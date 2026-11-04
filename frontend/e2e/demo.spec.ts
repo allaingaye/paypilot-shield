@@ -18,7 +18,7 @@ test("sign policy, verify a supplier, then pay, approve and block", async ({ pag
   await page.getByRole("button", { name: "Sign policy" }).click();
   await expect(page.getByText("Payment Authorized")).toBeVisible();
   
-  // FIX: Force it to find the button that contains the actual text "Close", not just the 'X' icon
+  // Click the visible "Close" button, not the "X" icon
   await page.getByRole("button", { name: "Close", exact: true, hasText: "Close" }).click();
 
   // verify the unverified supplier with a signature
@@ -28,10 +28,12 @@ test("sign policy, verify a supplier, then pay, approve and block", async ({ pag
   await page.getByRole("button", { name: "Sign and verify" }).click();
   await expect(page.getByText("Payment Authorized")).toBeVisible();
   
-  // FIX: Same fix here
+  // Click the visible "Close" button here as well
   await page.getByRole("button", { name: "Close", exact: true, hasText: "Close" }).click();
   
   await expect(page.getByText(/Verified by owner@paypilot.demo with a signature/)).toBeVisible();
+  
+  // Close the supplier drawer (this one uses the 'X' icon, so we don't need hasText)
   await page.getByRole("dialog", { name: "Unknown Supplier" }).getByRole("button", { name: "Close" }).click();
 
   // the three outcomes
