@@ -17,8 +17,9 @@ test("sign policy, verify a supplier, then pay, approve and block", async ({ pag
   await page.getByRole("button", { name: "Review and sign" }).click();
   await page.getByRole("button", { name: "Sign policy" }).click();
   await expect(page.getByText("Payment Authorized")).toBeVisible();
-  // FIX: Add exact: true so it clicks the big button, not the 'X' icon
-  await page.getByRole("button", { name: "Close", exact: true }).click();
+  
+  // FIX: Force it to find the button that contains the actual text "Close", not just the 'X' icon
+  await page.getByRole("button", { name: "Close", exact: true, hasText: "Close" }).click();
 
   // verify the unverified supplier with a signature
   await page.getByRole("link", { name: "Suppliers" }).first().click();
@@ -26,8 +27,9 @@ test("sign policy, verify a supplier, then pay, approve and block", async ({ pag
   await page.getByRole("button", { name: "Verify Supplier" }).click();
   await page.getByRole("button", { name: "Sign and verify" }).click();
   await expect(page.getByText("Payment Authorized")).toBeVisible();
-  // FIX: Add exact: true here as well
-  await page.getByRole("button", { name: "Close", exact: true }).click();
+  
+  // FIX: Same fix here
+  await page.getByRole("button", { name: "Close", exact: true, hasText: "Close" }).click();
   
   await expect(page.getByText(/Verified by owner@paypilot.demo with a signature/)).toBeVisible();
   await page.getByRole("dialog", { name: "Unknown Supplier" }).getByRole("button", { name: "Close" }).click();
