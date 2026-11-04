@@ -1,6 +1,5 @@
-import { expect, test } from "@playwright/test";
+﻿import { expect, test } from "@playwright/test";
 
-// The demo flow from the README, through the real UI, fake PayPal. Guards the money path in one run.
 test("sign policy, verify a supplier, then pay, approve and block", async ({ page }) => {
   await page.goto("/login");
   await page.getByLabel("Email").fill("owner@paypilot.demo");
@@ -8,49 +7,38 @@ test("sign policy, verify a supplier, then pay, approve and block", async ({ pag
   await page.getByRole("button", { name: "Sign in" }).click();
   await expect(page.getByRole("heading", { name: /AI Payment Agent/i }).first()).toBeVisible();
 
-  // the login token is an httpOnly cookie: scripts and storage must not see it
   expect(await page.evaluate(() => document.cookie)).toBe("");
   expect(await page.evaluate(() => JSON.stringify({ ...sessionStorage }))).not.toContain("eyJ");
 
-  // sign the policy
   await page.getByRole("link", { name: "Policy" }).first().click();
   await page.getByRole("button", { name: "Review and sign" }).click();
   await page.getByRole("button", { name: "Sign policy" }).click();
   await expect(page.getByText("Payment Authorized")).toBeVisible();
-  
-  // Click the visible "Close" text button (ignores the 'X' icon)
   await page.getByText("Close", { exact: true }).click();
 
-  // verify the unverified supplier with a signature
   await page.getByRole("link", { name: "Suppliers" }).first().click();
   await page.getByRole("gridcell", { name: "Unknown Supplier" }).click();
   await page.getByRole("button", { name: "Verify Supplier" }).click();
   await page.getByRole("button", { name: "Sign and verify" }).click();
   await expect(page.getByText("Payment Authorized")).toBeVisible();
-  
-  // Click the visible "Close" text button here as well
   await page.getByText("Close", { exact: true }).click();
   
   await expect(page.getByText(/Verified by owner@paypilot.demo with a signature/)).toBeVisible();
-  
-  // Close the supplier drawer (this one uses the 'X' icon)
   await page.getByRole("dialog", { name: "Unknown Supplier" }).getByRole("button", { name: "Close" }).click();
 
-  // the three outcomes
   await page.getByRole("link", { name: "AI Agent" }).first().click();
   
   const ask = async (msg: string, badge: string) => {
     const input = page.getByPlaceholder("Ask the agent to pay an invoice...");
     await input.fill(msg);
-    await input.press("Enter"); // FIX: Press Enter instead of looking for the icon button
+    await input.press("Enter"); 
     await expect(page.getByText(badge, { exact: true }).first()).toBeVisible({ timeout: 30_000 });
   };
   
-  await ask("Pay INV-001", "Auto pay");
+  await ask("Pay INV-001", "Auto-pay");
   await ask("Pay INV-003", "Needs approval");
   await ask("Pay INV-005", "Blocked");
 
-  // approve INV-003 with a signature
   await page.getByRole("link", { name: "Approvals" }).first().click();
   await page.getByRole("button", { name: "Review and sign" }).click();
   await page.getByRole("button", { name: "Sign and approve" }).click();

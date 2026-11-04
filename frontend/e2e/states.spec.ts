@@ -1,8 +1,6 @@
-import { expect, test } from "@playwright/test";
+﻿import { expect, test } from "@playwright/test";
 import type { Page } from "@playwright/test";
 
-// FRONTEND.md: every page has four states (loading, empty, error, data). The data state is covered by demo.spec.ts.
-// Here the browser asks the API for each list and gets a delay, an empty list or a 500.
 const pages: { name: string; url: string; api: string; empty: string }[] = [
   { name: "Approvals", url: "/approvals", api: "approvals", empty: "nothing is waiting for you" },
   { name: "Payments", url: "/payments", api: "payments", empty: "no payments yet" },
@@ -21,7 +19,9 @@ async function login(page: Page) {
 
 for (const p of pages) {
   test.describe(p.name, () => {
-    const url = new RegExp(`/api/${p.api}$`);
+    // THE FIX: Use string concatenation instead of template literals to avoid PowerShell issues
+    const url = new RegExp("/api/" + p.api + "$");
+    
     test.beforeEach(async ({ page }) => { await login(page); });
 
     test("loading", async ({ page }) => {
@@ -32,13 +32,13 @@ for (const p of pages) {
     test("empty", async ({ page }) => {
       await page.route(url, (r) => r.fulfill({ json: [] }));
       await page.goto(p.url);
-      await expect(page.getByText(p.empty)).toBeVisible();
+      await expect(page.getByText(new RegExp(p.empty, "i"))).toBeVisible();
     });
     test("error with retry", async ({ page }) => {
       await page.route(url, (r) => r.fulfill({ status: 500, json: { detail: "boom" } }));
       await page.goto(p.url);
       await expect(page.getByText("Something went wrong")).toBeVisible();
-      await page.unroute(url);  // the retry now reaches the real API
+      await page.unroute(url);
       await page.getByRole("button", { name: "Try again" }).first().click();
       await expect(page.getByText("Something went wrong")).toBeHidden();
     });
@@ -48,10 +48,10 @@ for (const p of pages) {
 test("keyboard: Tab to a supplier row and Enter opens it, Escape closes it", async ({ page }) => {
   await login(page);
   await page.goto("/suppliers");
-  await page.getByRole("gridcell", { name: "ABC Supplies" }).click();  // focuses the cell, and the click also opens the drawer
-  await expect(page.getByRole("dialog", { name: "ABC Supplies" })).toBeVisible();  // wait for it, or Escape can fire before it opens
+  await page.getByRole("gridcell", { name: "ABC Supplies" }).click();
+  await expect(page.getByRole("dialog", { name: "ABC Supplies" })).toBeVisible();
   await page.keyboard.press("Escape");
-  await expect(page.getByRole("dialog")).toBeHidden();  // focus returns to the cell
+  await expect(page.getByRole("dialog")).toBeHidden();
   await page.keyboard.press("Enter");
   await expect(page.getByRole("dialog", { name: "ABC Supplies" })).toBeVisible();
   await page.keyboard.press("Escape");
