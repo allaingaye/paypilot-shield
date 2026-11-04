@@ -38,10 +38,12 @@ test("sign policy, verify a supplier, then pay, approve and block", async ({ pag
 
   // the three outcomes
   await page.getByRole("link", { name: "AI Agent" }).first().click();
+  
   const ask = async (msg: string, badge: string) => {
-    await page.getByPlaceholder("Ask the agent to pay an invoice...").fill(msg);
-    await page.getByRole("button", { name: "Send" }).click();
-    await expect(page.getByText(badge, { exact: true }).first()).toBeVisible({ timeout: 20_000 });
+    const input = page.getByPlaceholder("Ask the agent to pay an invoice...");
+    await input.fill(msg);
+    await input.press("Enter"); // FIX: Press Enter instead of looking for the icon button
+    await expect(page.getByText(badge, { exact: true }).first()).toBeVisible({ timeout: 30_000 });
   };
   
   await ask("Pay INV-001", "Auto pay");
