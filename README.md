@@ -4,7 +4,19 @@
 
 **An AI agent that pays supplier invoices through PayPal Payouts, but only inside a spending policy the owner has signed, and only after the invoice passes a truth check. Every decision is written to an audit log you can replay.**
 
-Built for the [PayPal AI Hackathon](https://paypalaihackathon.devpost.com/). Live demo (PayPal sandbox): https://paypilot.donambi.dev. Privacy and terms: [/privacy](https://paypilot.donambi.dev/privacy).
+Built for the [PayPal AI Hackathon](https://paypalaihackathon.devpost.com/). Live demo (PayPal sandbox): https://paypilot.donambi.dev. Demo video (2:47): https://youtu.be/rzRGXtTX43g. Privacy and terms: [/privacy](https://paypilot.donambi.dev/privacy).
+
+## Try the live demo
+
+1. Open https://paypilot.donambi.dev and sign in. The demo login is in the Devpost testing instructions.
+2. Nothing is paid until the owner has signed a policy. Open **Policy**, set the auto limit to 500 and the monthly budget to 5,000, then **Review and sign**. Signing creates a key in your browser.
+3. Open the agent chat and try the five demo invoices (see the table below):
+   - `Pay INV-001` is paid automatically (`AUTO_PAY`).
+   - `Pay INV-003` is over the limit, so it waits on the **Approvals** page, where you sign the exact payment (`NEEDS_APPROVAL`).
+   - `Pay INV-005` is blocked because the payee email changed and the invoice hides instructions (`BLOCKED`). Ask `Why INV-005?` for the reasons.
+4. Open **Payments** to see each outcome and the replay of every audit step.
+
+Everything runs against the PayPal sandbox, so no real money moves. An invoice can only be paid once. If INV-001 already shows as paid, the live demo has been used before, so run the project locally with the Docker quick start below for a fresh state.
 
 ## The problem
 
@@ -53,11 +65,11 @@ Business email compromise and fake invoices cost companies billions every year. 
 
 | Layer | Contents | Stack |
 |---|---|---|
-| Presentation | Chat, policy editor, approvals, operations grid, audit replay | React, Vite, TypeScript, AG Grid, WebCrypto |
-| API | Auth, endpoints | FastAPI, Pydantic, JWT |
+| Presentation | Chat, policy editor, approvals, suppliers, operations grid, audit replay | React, Vite, TypeScript, AG Grid, WebCrypto |
+| API | Auth, endpoints, PayPal webhook | FastAPI, Pydantic, JWT |
 | AI agent | Tool calling loop with read-only tools | LLM with a rule based fallback |
-| Trust and decision | Truth check, decision, signed policy, verifier | Plain Python, `cryptography` |
-| Data and integrations | Invoices, suppliers, transactions, audit events, PayPal | PostgreSQL, SQLAlchemy, PayPal Payouts sandbox |
+| Trust and decision | Truth check, AI screen, decision, signed policy and supplier verification, verifier | Plain Python, `cryptography` |
+| Data and integrations | Invoices, suppliers, transactions, audit events, PayPal | PostgreSQL (SQLite by default and in tests), SQLAlchemy, PayPal Payouts sandbox |
 
 ![Architecture](docs/architecture.png)
 
@@ -70,7 +82,7 @@ More detail: [docs/architecture.md](docs/architecture.md), [docs/layer1.md](docs
 | Layer 1, core (login, invoices, pipeline, agent, real sandbox payout, audit log) | Done |
 | Layer 2, trust (owner-signed policy, signed approvals, verifier, tamper test) | Done |
 | Layer 3, detection (extra fraud signals and an AI screen that can only raise risk) | Done |
-| Layer 4, presentation (UI, AG Grid, replay page) | Built, tested in Docker (including the `/paypilot/` base path) and live at https://paypilot.donambi.dev. Polish done: keyboard access, loading and error states, e2e tests |
+| Layer 4, presentation (UI, AG Grid, replay page) | Done. Live at https://paypilot.donambi.dev, tested in Docker (including the `/paypilot/` base path), with keyboard access, loading and error states and Playwright e2e tests |
 
 ## Screenshots
 
@@ -83,20 +95,34 @@ Taken on a local run with the fake PayPal stand-in (see `docs/screenshots/` for 
 
 ## Quick start (local)
 
-**Requirements:** Python 3.11+, Node.js 20+, PostgreSQL 14+, a PayPal developer account.
+**Requirements:** Python 3.11+, Node.js 20+, PostgreSQL 14+. A PayPal developer account is needed for real sandbox payouts; without one set `PAYPAL_MODE=fake` in `.env` and skip step 3 (the fake client never calls PayPal).
+
+To skip the manual setup, use the [Docker Compose](#docker-compose) steps in the Deployment section instead. They bring up the database, backend and frontend with one command.
 
 ### 1. Database
 
 Edit the password in `scripts/setup_local_postgres.sql`, then:
 
 ```bash
+# Linux
 sudo -u postgres psql -f scripts/setup_local_postgres.sql
+# macOS (Homebrew Postgres)
+psql postgres -f scripts/setup_local_postgres.sql
+```
+
+```powershell
+# Windows (PowerShell). psql comes with the PostgreSQL installer; add its bin folder to PATH or use "SQL Shell (psql)"
+psql -U postgres -f scripts\setup_local_postgres.sql
 ```
 
 ### 2. Environment file
 
 ```bash
-cp .env.example .env
+cp .env.example .env          # Linux and macOS
+```
+
+```powershell
+copy .env.example .env        # Windows (PowerShell or cmd)
 ```
 
 Fill in `DATABASE_URL` (same password as above), `JWT_SECRET`, `DEMO_PASSWORD`, `PAYPAL_CLIENT_ID` and `PAYPAL_CLIENT_SECRET`.
@@ -116,16 +142,31 @@ Check the credentials before building on them:
 python scripts/test_paypal_sandbox.py --payout --email sb-xxxx@personal.example.com
 ```
 
+On Windows use `py` instead of `python` if `python` is not found, and `scripts\test_paypal_sandbox.py` as the path.
+
 ### 4. Backend
 
 ```bash
+# Linux and macOS
 cd backend
 python -m venv venv
 source venv/bin/activate
 pip install -r requirements.txt
-python seed.py                              # creates tables and loads the five demo invoices
+python seed.py                              # WIPES all data, then loads the suppliers and five demo invoices
 uvicorn app.main:app --reload --port 8000
 ```
+
+```powershell
+# Windows (PowerShell)
+cd backend
+py -m venv venv
+venv\Scripts\Activate.ps1                  # in cmd.exe: venv\Scripts\activate.bat
+pip install -r requirements.txt
+python seed.py                              # WIPES all data, then loads the suppliers and five demo invoices
+uvicorn app.main:app --reload --port 8000
+```
+
+If PowerShell refuses to run `Activate.ps1`, run `Set-ExecutionPolicy -Scope CurrentUser RemoteSigned` once.
 
 Open <http://localhost:8000/docs> for the interactive API, or <http://localhost:8000/health> for a quick check.
 
@@ -147,7 +188,7 @@ Open <http://localhost:5173> and sign in with `DEMO_EMAIL` and `DEMO_PASSWORD` t
 
 Other messages to try: `Pay INV-003`, `Pay INV-004`, `Pay INV-005`, `Why INV-005?`, `List invoices`.
 
-Nothing is paid until the owner has signed a policy. In the web app open **Policy**, then **Review and sign**. Without the frontend, run `python ../scripts/sign_policy.py` from `backend/`. Payments above the auto limit wait on the **Approvals** page, where the owner signs the exact payment.
+Nothing is paid until the owner has signed a policy. In the web app open **Policy**, then **Review and sign**. Without the frontend, run `python ../scripts/sign_policy.py` from `backend/` (`python ..\scripts\sign_policy.py` on Windows). Payments above the auto limit wait on the **Approvals** page, where the owner signs the exact payment.
 
 **Test aids (development only).** With `APP_ENV=development` the backend also mounts `PATCH /dev/invoices/{number}` (change an invoice amount or payee after it was evaluated) and `POST /dev/mandates/{id}/tamper` (break the signed policy). They exist to demo that the verifier refuses tampered data, and they never touch PayPal. They are not mounted in any other environment.
 
@@ -156,7 +197,8 @@ Nothing is paid until the owner has signed a policy. In the web app open **Polic
 | Variable | Purpose |
 |---|---|
 | `APP_ENV` | `production` (default) or `development`. Development mounts the `/dev` tamper helpers and allows weak secrets |
-| `DATABASE_URL` | PostgreSQL connection string |
+| `DATABASE_URL` | PostgreSQL connection string, for running outside Docker (default: a local SQLite file) |
+| `DOCKER_DATABASE_URL`, `POSTGRES_PASSWORD` | Docker only. Use your own Postgres instead of the bundled `db`, or change the bundled one's password before its first run |
 | `JWT_SECRET` | Signs login tokens. Outside development at least 32 random characters |
 | `DEMO_EMAIL`, `DEMO_PASSWORD` | The seeded owner account. Outside development the password needs at least 12 characters |
 | `PAYPAL_MODE` | `sandbox` for real sandbox calls, `fake` for an offline stand-in |
@@ -193,7 +235,7 @@ cd backend
 pytest -q
 ```
 
-The suite uses the fake PayPal client and a temporary SQLite database, so it needs no credentials and never calls PayPal. It covers the five demo invoices, signed supplier verification, idempotency (no double payment), the audit trace, the API and the agent loop, the signed policy and approvals (Layer 2), the fraud signals (Layer 3) and the security hardening ([docs/security.md](docs/security.md)).
+The suite uses the fake PayPal client and a temporary SQLite database, so it needs no credentials and never calls PayPal. One test, `test_budget_lock.py` (the monthly budget lock), needs Postgres and is skipped otherwise: run `TEST_DATABASE_URL=postgresql://... pytest -q` to include it (CI does; in PowerShell set `$env:TEST_DATABASE_URL = "postgresql://..."` first). The suite covers the five demo invoices, signed supplier verification, idempotency (no double payment), the audit trace, the API and the agent loop, the signed policy and approvals (Layer 2), the fraud signals (Layer 3) and the security hardening ([docs/security.md](docs/security.md)).
 
 ### End-to-end tests
 
@@ -201,6 +243,12 @@ The suite uses the fake PayPal client and a temporary SQLite database, so it nee
 cd frontend
 npm ci && npx playwright install chromium
 E2E_PYTHON=../backend/venv/bin/python npm run e2e   # starts its own backend (fake PayPal, SQLite) and Vite
+```
+
+On Windows (PowerShell):
+
+```powershell
+$env:E2E_PYTHON = "..\backend\venv\Scripts\python.exe"; npm run e2e
 ```
 
 Covers the demo flow, signing, loading, empty and error states, and keyboard access to grid rows. CI runs the same job.
@@ -212,14 +260,44 @@ Live demo: https://paypilot.donambi.dev (PayPal sandbox). The production stack r
 ### Docker Compose
 
 ```bash
-cp .env.example .env        # then edit it, see below
+cp .env.example .env        # then edit it, see below (Windows: copy .env.example .env)
 docker compose up --build   # open http://localhost:8080 (set FRONTEND_PORT in .env to publish another port)
 docker compose exec backend python seed.py   # first run only, loads suppliers, invoices and the owner account
 ```
 
-Three services: `db` (bundled Postgres 16, data in the `pgdata` volume, not published), `backend` (FastAPI, not published; uses the bundled `db` unless `DOCKER_DATABASE_URL` is set in `.env`, `DATABASE_URL` is only for running outside Docker) and `frontend` (nginx serving the built app and proxying `/api` to the backend). With `APP_ENV=development` in `.env` it runs with the `/dev` helpers on and weak secrets allowed. Without it, set a real `JWT_SECRET` and `DEMO_PASSWORD` or the backend refuses to start. For the `/paypilot/` path on the VPS build with `VITE_BASE=/paypilot/ docker compose build frontend` and strip the prefix in the host nginx (see [docs/layer4.md](docs/layer4.md)). The "Simulate tampering" demo button shows automatically when the backend runs with `APP_ENV=development`. Inside the container `localhost` is the container itself, so for a Postgres on the same machine set `DOCKER_DATABASE_URL=postgresql://user:pass@host.docker.internal:5432/paypilot` and make it accept connections from Docker (`listen_addresses` and `pg_hba.conf`). Copy `.env.example` to `.env` first (`cp` on Linux, `copy` on Windows), compose refuses to start without it. Signing needs HTTPS or `localhost`. `seed.py` wipes all data, so do not run it on data you want to keep.
+Three services:
 
-The live site is a VPS with a host nginx (TLS) in front of this compose stack (see [docs/security.md](docs/security.md) for the proxy headers). On any public server leave `APP_ENV` at its default (`production`): the API then refuses to start unless `JWT_SECRET` has at least 32 random characters and `DEMO_PASSWORD` at least 12, and the `/dev` tamper helpers are not mounted. Set `APP_ENV=development` only on your own machine. GitHub Actions ([ci.yml](.github/workflows/ci.yml)) runs the tests on every push and pull request.
+- `db`: bundled Postgres 16, data in the `pgdata` volume, not published.
+- `backend`: FastAPI, not published. It uses the bundled `db` unless `DOCKER_DATABASE_URL` is set in `.env` (`DATABASE_URL` is only for running outside Docker).
+- `frontend`: nginx serving the built app and proxying `/api` to the backend. It is published on `127.0.0.1` only, so a host nginx or a browser on the same machine can reach it, but other machines cannot.
+
+Notes:
+
+- Copy `.env.example` to `.env` first (`cp` on Linux, `copy` on Windows). Compose refuses to start without it.
+- With `APP_ENV=development` it runs with the `/dev` helpers on and weak secrets allowed. Without it, set a real `JWT_SECRET` and `DEMO_PASSWORD` or the backend refuses to start.
+- The "Simulate tampering" button shows automatically when the backend runs with `APP_ENV=development`.
+- Your own Postgres: inside the container `localhost` is the container itself, so for a Postgres on the same machine set `DOCKER_DATABASE_URL=postgresql://user:pass@host.docker.internal:5432/paypilot` and let it accept connections from Docker (`listen_addresses` and `pg_hba.conf`).
+- For the `/paypilot/` path on the VPS build with `VITE_BASE=/paypilot/ docker compose build frontend` and strip the prefix in the host nginx (see [docs/layer4.md](docs/layer4.md)).
+- Signing needs HTTPS or `localhost`.
+- `seed.py` wipes all data, so do not run it on data you want to keep.
+
+The live site is a VPS with a host nginx (TLS) in front of this compose stack, which listens on host port 18001 (`FRONTEND_PORT`; see [docs/security.md](docs/security.md) for the proxy headers). On any public server leave `APP_ENV` at its default (`production`): the API then refuses to start unless `JWT_SECRET` has at least 32 random characters and `DEMO_PASSWORD` at least 12, and the `/dev` tamper helpers are not mounted. Set `APP_ENV=development` only on your own machine. GitHub Actions ([ci.yml](.github/workflows/ci.yml)) runs the tests on every push and pull request.
+
+### Updating the live site
+
+Change tracked files on your own machine, push to `main`, then run the deploy script on the server:
+
+```bash
+bash scripts/deploy.sh
+```
+
+The script does a hard pull of `origin/main`, prints a warning for any variable in `.env.example` that is missing from the server `.env`, rebuilds with Docker Compose and removes old images. Tracked files are reset to `origin/main`, so never edit them on the server. Server only settings (secrets, `FRONTEND_PORT`) belong in `.env`, which is not tracked and is never overwritten.
+
+To reset the demo data on a running server, run `docker compose exec backend python seed.py`. It wipes all data and reloads the suppliers, the five demo invoices and the owner account, so sign the policy again afterwards.
+
+### Dependency updates
+
+`backend/requirements.txt` is compiled with `uv`. Run `./scripts/update-deps.sh` to regenerate it, or `./scripts/update-deps.sh --upgrade-package <name>` to bump one package. CI runs `pip-audit` on every push as an advisory step, and the weekly `dependency-audit` workflow ([audit.yml](.github/workflows/audit.yml)) fails when a known vulnerability appears in the lockfile.
 
 ## Project structure
 
@@ -230,9 +308,10 @@ backend/Dockerfile  Backend image (non-root)
 frontend/src/       Pages, components, API client, WebCrypto signing
 frontend/e2e/         Playwright tests (demo path, states, keyboard)
 frontend/Dockerfile, frontend/nginx.conf   Frontend image: built app plus the /api proxy
-docker-compose.yml  Backend and frontend services
-docs/               Architecture, layer notes, security, API contract, design, demo script, dev log
-scripts/            Database setup SQL and PayPal sandbox test
+docker-compose.yml  Database, backend and frontend services
+docs/               Architecture, layer notes, security, API contract, design, dev log
+scripts/            Database setup SQL, PayPal sandbox test, policy signing helper, deploy and dependency update scripts
+.github/workflows/  CI (tests, type check, build, e2e) and the weekly dependency audit
 ```
 
 ## Limitations and roadmap
@@ -242,6 +321,8 @@ scripts/            Database setup SQL and PayPal sandbox test
 - Suppliers can be added and verified in the app (the owner signs the verification in the browser). Only the demo suppliers come from `backend/seed.py`.
 - Payment status can lag: a sandbox payout stays pending for about 35 seconds. The PayPal webhook, the Payments page poll and the Refresh button settle it.
 - Planned: fraud thresholds inside the signed policy, LLM drafting of the policy, dispute handling, multi-user roles. (The AI screen that can only raise risk is already built, see [docs/layer3.md](docs/layer3.md).)
+- The AI screen fails silently: if the LLM is down or answers badly, the rules decide alone and nothing is logged about it.
+- The atomic monthly budget lock relies on a PostgreSQL advisory lock, so it is only enforced on Postgres, not on the SQLite default.
 - Known security gaps are listed in [docs/security.md](docs/security.md).
 - Data sharing: with AI mode on, chat messages and the invoice details the agent looks up go to the LLM provider (Groq on the live demo). Payout requests go to the PayPal sandbox. The `/privacy` page says this in plain words.
 
@@ -250,11 +331,11 @@ scripts/            Database setup SQL and PayPal sandbox test
 | Name | GitHub | Contact |
 |---|---|---|
 | Thierry Donambi | [@Elthiero](https://github.com/Elthiero) | thierrydonambi@gmail.com |
-| Alain Gaye | [@alaingaye](https://github.com/alaingaye) | lucienallaingaye@gmail.com |
+| Alain Gaye | [@alaingaye](https://github.com/alaingaye) | via GitHub |
 
 ## Contributing
 
-Work happens on short-lived branches and pull requests into `main`. Each pull request needs a green `ci` run and a review from the other team member. Run `pytest -q` in `backend/`, and `npx tsc --noEmit`, `npm run build` and `npm run e2e` in `frontend/` before opening one. Never commit `.env`, and add every new environment variable to `.env.example` in the same pull request.
+Changes should go through short-lived branches and pull requests into `main` with a green `ci` run (so far the history is direct commits to `main` by one author). Run `pytest -q` in `backend/`, and `npx tsc --noEmit`, `npm run build` and `npm run e2e` in `frontend/` before opening one. Never commit `.env`, and add every new environment variable to `.env.example` in the same pull request.
 
 ## License
 

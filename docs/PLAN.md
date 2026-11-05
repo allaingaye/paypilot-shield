@@ -75,8 +75,6 @@ Tasks only, ticked when done. Update the checkboxes in your pull requests.
 
 - [x] Whole demo path (see below) runs on the live URL. The tamper step cannot run live because demo tools are off in production
 - [x] Screenshots in `docs/screenshots/`
-- [x] Devpost text drafted in `docs/devpost.md`
-- [x] Demo script in `docs/demo-script.md`
 - [ ] Time the demo path (target under 3 minutes)
 - [ ] Bug bash on the live URL: one person drives the demo path, the other watches the console and server logs
 - [ ] Record the video: public on YouTube, under 3 minutes, no PayPal logos, no copyrighted music

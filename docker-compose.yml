@@ -44,7 +44,7 @@ services:
       args:
         VITE_BASE: ${VITE_BASE:-/}
     ports:
-      - "${FRONTEND_PORT:-8080}:80"  # the VPS sets FRONTEND_PORT=18001 in .env for the host nginx
+      - "127.0.0.1:${FRONTEND_PORT:-8080}:80"  # the VPS sets FRONTEND_PORT=18001 in .env for the host nginx
     depends_on:
       backend:
         condition: service_healthy
